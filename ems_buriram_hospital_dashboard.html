@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสารสนเทศงานฉุกเฉินการแพทย์ โรงพยาบาลบุรีรัมย์ (EMS Buriram Dashboard)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Sarabun & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Sarabun', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        buriram: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        },
+                        triage: {
+                            red: '#ef4444',
+                            yellow: '#eab308',
+                            green: '#22c55e',
+                            white: '#f8fafc',
+                            black: '#1e293b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+        .triage-card-red { border-left: 6px solid #ef4444; }
+        .triage-card-yellow { border-left: 6px solid #eab308; }
+        .triage-card-green { border-left: 6px solid #22c55e; }
+        .triage-card-white { border-left: 6px solid #cbd5e1; }
+        .triage-card-black { border-left: 6px solid #0f172a; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Top Header Navigation -->
+    <header class="bg-gradient-to-r from-slate-900 via-sky-900 to-slate-900 text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-red-600 p-2.5 rounded-xl shadow-md flex items-center justify-center text-white ring-2 ring-white/20">
+                        <i class="fa-solid font-bold fa-truck-medical text-2xl animate-pulse"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white">EMS Dashboard รพ.บุรีรัมย์</h1>
+                            <span class="bg-sky-500/30 text-sky-200 text-xs px-2.5 py-0.5 rounded-full border border-sky-400/30 font-medium">ฉุกเฉินการแพทย์</span>
+                        </div>
+                        <p class="text-xs text-slate-300">ศูนย์รับแจ้งเหตุและสั่งการออกปฏิบัติการกู้ชีพ - โรงพยาบาลบุรีรัมย์</p>
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <button id="btnOpenAddModal" onclick="openModal('addCaseModal')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-lg font-medium text-sm flex items-center gap-1.5 shadow-md transition-all active:scale-95">
+                        <i class="fa-solid fa-circle-plus"></i>
+                        <span>บันทึกเหตุฉุกเฉิน</span>
+                    </button>
+                    <label class="bg-sky-700 hover:bg-sky-600 text-white px-3.5 py-2 rounded-lg font-medium text-sm flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span>นำเข้า CSV</span>
+                        <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleCSVUpload(event)">
+                    </label>
+                    <button onclick="exportToCSV()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg font-medium text-sm flex items-center gap-1.5 shadow-md transition-all">
+                        <i class="fa-solid fa-download"></i>
+                        <span class="hidden sm:inline">ส่งออก CSV</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Filter Controls Bar -->
+        <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80">
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                <div class="flex items-center gap-2 text-slate-700 font-semibold border-b lg:border-b-0 pb-2 lg:pb-0 border-slate-100">
+                    <i class="fa-solid fa-filter text-sky-600"></i>
+                    <span>ตัวกรองข้อมูล:</span>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 flex-1">
+                    <!-- Filter: Vehicle -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">รถออกปฏิบัติการ</label>
+                        <select id="filterVehicle" onchange="applyFilters()" class="w-full text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="ALL">ทั้งหมด (AM / บร / กระทรวง)</option>
+                            <option value="AM1">AM1 (ALS)</option>
+                            <option value="AM4">AM4 (ALS)</option>
+                            <option value="BR">ทะเบียน บร (ทะเบียนจังหวัดบุรีรัมย์)</option>
+                            <option value="MOH">ทะเบียนกระทรวงสาธารณสุข</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter: Triage Level -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">ระดับความรุนแรง (Triage)</label>
+                        <select id="filterTriage" onchange="applyFilters()" class="w-full text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="ALL">ทุกระดับ Triage</option>
+                            <option value="RED">🔴 สีแดง (วิกฤต)</option>
+                            <option value="YELLOW">🟡 สีเหลือง (เร่งด่วน)</option>
+                            <option value="GREEN">🟢 สีเขียว (ไม่รุนแรง)</option>
+                            <option value="WHITE">⚪ สีขาว (ทั่วไป)</option>
+                            <option value="BLACK">⚫ สีดำ (เสียชีวิต)</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter: Fast Track -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">กลุ่มโรค Fast Track</label>
+                        <select id="filterFastTrack" onchange="applyFilters()" class="w-full text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="ALL">รวมทุกกลุ่มโรค / Fast Track</option>
+                            <option value="FT_ONLY">เฉพาะเคส Fast Track ทั้งหมด</option>
+                            <option value="Stroke">🧠 Stroke (หลอดเลือดสมอง)</option>
+                            <option value="Sepsis">🦠 Sepsis (ติดเชื้อในกระแสเลือด)</option>
+                            <option value="Trauma FT">🩹 Trauma Fast Track</option>
+                            <option value="STEMI">🫀 STEMI (กล้ามเนื้อหัวใจขาดเลือด)</option>
+                            <option value="Cardiac Arrest">⚡ Cardiac Arrest (หัวใจหยุดเต้น)</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter: Incident Type (Accident vs General) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">ประเภทเหตุ</label>
+                        <select id="filterType" onchange="applyFilters()" class="w-full text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="ALL">ทุกประเภทเหตุ</option>
+                            <option value="TRAUMA">🚗 อุบัติเหตุ (Trauma)</option>
+                            <option value="NON_TRAUMA">🩺 เจ็บป่วยทั่วไป (Non-Trauma)</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter: Search Location/Keyword -->
+                    <div class="col-span-2 sm:col-span-4 lg:col-span-1">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">ค้นหาสถานที่ / หมายเหตุ</label>
+                        <div class="relative">
+                            <input type="text" id="filterSearch" oninput="applyFilters()" placeholder="ค้นหาจุดเกิดเหตุ, บก..." class="w-full text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-lg p-2 pl-8 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="resetFilters()" class="text-xs text-slate-500 hover:text-sky-600 font-medium underline flex items-center gap-1 self-end lg:self-center">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>ล้างตัวกรอง</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- KPI Summary Cards -->
+        <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <!-- Total Dispatches -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">เคสทั้งหมด</span>
+                    <div class="bg-sky-100 text-sky-700 p-2 rounded-lg text-sm"><i class="fa-solid fa-clipboard-list"></i></div>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiTotalCases" class="text-2xl sm:text-3xl font-extrabold text-slate-800">0</div>
+                    <p class="text-xs text-slate-500 mt-1">จำนวนเหตุออกรับบริการ</p>
+                </div>
+            </div>
+
+            <!-- Triage Red Card -->
+            <div class="bg-white p-4 rounded-xl border-l-4 border-l-red-500 border-y border-r border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-red-600 uppercase tracking-wider">🔴 สีแดง (วิกฤต)</span>
+                    <div class="bg-red-100 text-red-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-heart-pulse"></i></div>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiRedCases" class="text-2xl sm:text-3xl font-extrabold text-red-600">0</div>
+                    <p class="text-xs text-slate-500 mt-1" id="kpiRedPercent">0% ของเคสทั้งหมด</p>
+                </div>
+            </div>
+
+            <!-- Triage Yellow Card -->
+            <div class="bg-white p-4 rounded-xl border-l-4 border-l-amber-500 border-y border-r border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-amber-600 uppercase tracking-wider">🟡 สีเหลือง</span>
+                    <div class="bg-amber-100 text-amber-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiYellowCases" class="text-2xl sm:text-3xl font-extrabold text-amber-600">0</div>
+                    <p class="text-xs text-slate-500 mt-1">เคสเร่งด่วน</p>
+                </div>
+            </div>
+
+            <!-- Triage Green / White / Black summary -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">🟢/⚪/⚫ เขียว/ขาว/ดำ</span>
+                    <div class="bg-emerald-100 text-emerald-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-user-check"></i></div>
+                </div>
+                <div class="mt-2">
+                    <div class="flex items-baseline space-x-2">
+                        <span id="kpiGreenCases" class="text-xl font-bold text-emerald-600">0</span>
+                        <span class="text-xs text-slate-400">/</span>
+                        <span id="kpiWhiteCases" class="text-xl font-bold text-slate-500">0</span>
+                        <span class="text-xs text-slate-400">/</span>
+                        <span id="kpiBlackCases" class="text-xl font-bold text-slate-900">0</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">ไม่รุนแรง / ทั่วไป / เสียชีวิต</p>
+                </div>
+            </div>
+
+            <!-- Trauma Cases -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">🚗 อุบัติเหตุ</span>
+                    <div class="bg-orange-100 text-orange-600 p-2 rounded-lg text-sm"><i class="fa-solid fa-car-burst"></i></div>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiTraumaCases" class="text-2xl sm:text-3xl font-extrabold text-orange-600">0</div>
+                    <p class="text-xs text-slate-500 mt-1" id="kpiTraumaPercent">0% ของเคสทั้งหมด</p>
+                </div>
+            </div>
+
+            <!-- Fast Track Summary -->
+            <div class="bg-gradient-to-br from-indigo-900 to-sky-900 p-4 rounded-xl text-white shadow-md flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-indigo-200 uppercase tracking-wider">⚡ FAST TRACK</span>
+                    <div class="bg-white/10 text-indigo-200 p-2 rounded-lg text-sm backdrop-blur-sm"><i class="fa-solid fa-bolt"></i></div>
+                </div>
+                <div class="mt-2">
+                    <div id="kpiFastTrackTotal" class="text-2xl sm:text-3xl font-extrabold text-white">0</div>
+                    <p class="text-xs text-indigo-200 mt-1">วิกฤตต้องการการดูแลด่วนพิเศษ</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Layout Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <!-- Chart 1: Fast Track Breakdown -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-stethoscope text-indigo-600"></i>
+                        <span>สรุปเคส Fast Track รายกลุ่มโรค</span>
+                    </h3>
+                    <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">5 โรคสำคัญ</span>
+                </div>
+                <div class="relative flex-1 min-h-[240px]">
+                    <canvas id="fastTrackChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Triage Level Distribution -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-sky-600"></i>
+                        <span>สัดส่วน Triage (แดง/เหลือง/เขียว/ขาว/ดำ)</span>
+                    </h3>
+                    <span class="text-xs text-slate-400">ระดับความรุนแรง</span>
+                </div>
+                <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+                    <canvas id="triageChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Vehicles Breakdown (AM1, AM4, บร, กระทรวง) -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:col-span-2 lg:col-span-1">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-truck-ambulance text-amber-600"></i>
+                        <span>จำแนกรถกู้ชีพ/พยาบาลออกปฏิบัติการ</span>
+                    </h3>
+                    <span class="text-xs text-slate-400">AM1 / AM4 / ทะเบียน</span>
+                </div>
+                <div class="relative flex-1 min-h-[240px]">
+                    <canvas id="vehicleChart"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Fast Track Breakdown Summary Pill Indicators -->
+        <section class="bg-indigo-50/80 border border-indigo-100 p-4 rounded-xl">
+            <h4 class="text-xs font-bold text-indigo-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <i class="fa-solid fa-notes-medical text-indigo-600"></i>
+                <span>รายละเอียดเคสวิกฤต Fast Track ประจำช่วงเวลา:</span>
+            </h4>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div class="bg-white p-3 rounded-lg border border-indigo-100 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500">🧠 Stroke</p>
+                        <p id="ftStrokeCount" class="text-lg font-bold text-slate-800">0 เคส</p>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-indigo-100 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500">🦠 Sepsis</p>
+                        <p id="ftSepsisCount" class="text-lg font-bold text-slate-800">0 เคส</p>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-indigo-100 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500">🩹 Trauma FT</p>
+                        <p id="ftTraumaCount" class="text-lg font-bold text-slate-800">0 เคส</p>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-indigo-100 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500">🫀 STEMI</p>
+                        <p id="ftStemiCount" class="text-lg font-bold text-slate-800">0 เคส</p>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                </div>
+                <div class="bg-white p-3 rounded-lg border border-indigo-100 shadow-xs flex items-center justify-between col-span-2 sm:col-span-1">
+                    <div>
+                        <p class="text-xs text-slate-500">⚡ Cardiac Arrest</p>
+                        <p id="ftArrestCount" class="text-lg font-bold text-slate-800">0 เคส</p>
+                    </div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-700"></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Table Section (Location & Incident details) -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <!-- Table Header Bar -->
+            <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-sky-600"></i>
+                        <span>รายการออกรับผู้ป่วยฉุกเฉิน โรงพยาบาลบุรีรัมย์</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">แสดงข้อมูลการออกปฏิบัติการ สถานที่เกิดเหตุ รถที่ใช้ และการคัดกรอง Triage</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                    <span id="recordCountText" class="font-semibold text-slate-700">แสดง 0 รายการ</span>
+                </div>
+            </div>
+
+            <!-- Responsive Table Container -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs sm:text-sm text-slate-600">
+                    <thead class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider font-semibold border-b border-slate-200">
+                        <tr>
+                            <th scope="col" class="py-3 px-4 w-12 text-center">#</th>
+                            <th scope="col" class="py-3 px-4">วัน-เวลา / เลขปฏิบัติการ</th>
+                            <th scope="col" class="py-3 px-4">รถออกรับเหตุ</th>
+                            <th scope="col" class="py-3 px-4">ระดับ Triage</th>
+                            <th scope="col" class="py-3 px-4">อาการ/โรค/Fast Track</th>
+                            <th scope="col" class="py-3 px-4 min-w-[240px]">สถานที่เกิดเหตุ (Incident Location)</th>
+                            <th scope="col" class="py-3 px-4">ประเภทเหตุ</th>
+                            <th scope="col" class="py-3 px-4 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incidentTableBody" class="divide-y divide-slate-200">
+                        <!-- Table rows populated dynamically via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Footer Pagination/Info -->
+            <div id="tableEmptyState" class="hidden p-8 text-center text-slate-400">
+                <i class="fa-solid fa-folder-open text-4xl mb-2 text-slate-300"></i>
+                <p class="text-sm">ไม่พบข้อมูลตามเงื่อนไขตัวกรองที่เลือก</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Add New Incident Record -->
+    <div id="addCaseModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden my-8 transform transition-all">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-sky-900 to-slate-900 text-white p-4 px-6 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-ambulance text-amber-400"></i>
+                    <span>บันทึกข้อมูลการออกเหตุฉุกเฉิน (EMS Buriram)</span>
+                </h3>
+                <button onclick="closeModal('addCaseModal')" class="text-slate-300 hover:text-white text-xl font-bold">
+                    &times;
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form id="addCaseForm" onsubmit="saveNewCase(event)" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Date & Time -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">วัน-เวลา ออกรับเหตุ <span class="text-red-500">*</span></label>
+                        <input type="datetime-local" id="inputDateTime" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+
+                    <!-- Ambulance / Vehicle -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">รถออกปฏิบัติการ <span class="text-red-500">*</span></label>
+                        <select id="inputVehicleType" onchange="toggleVehicleRegInput()" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="AM1">AM1 (ALS - รพ.บุรีรัมย์)</option>
+                            <option value="AM4">AM4 (ALS - รพ.บุรีรัมย์)</option>
+                            <option value="BR">ทะเบียน บร (จังหวัดบุรีรัมย์)</option>
+                            <option value="MOH">ทะเบียนกระทรวงสาธารณสุข</option>
+                        </select>
+                    </div>
+
+                    <!-- Vehicle Registration Number -->
+                    <div class="sm:col-span-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">เลขทะเบียนรถ / หมายเลขเฉพาะ</label>
+                        <input type="text" id="inputVehicleReg" placeholder="เช่น บร 1234 บุรีรัมย์ หรือ กท 9876 กระทรวงสาธารณสุข" class="w-full text-sm border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                        <p class="text-[11px] text-slate-500 mt-1">* กำหนดเลขทะเบียนจังหวัดขึ้นต้นด้วย "บร" หรือสังเกตหน่วยงานกระทรวง</p>
+                    </div>
+
+                    <!-- Triage Level -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ระดับ Triage <span class="text-red-500">*</span></label>
+                        <select id="inputTriage" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="RED">🔴 สีแดง - วิกฤต (Resuscitation / Emergent)</option>
+                            <option value="YELLOW">🟡 สีเหลือง - เร่งด่วน (Urgent)</option>
+                            <option value="GREEN">🟢 สีเขียว - ไม่รุนแรง (Non-urgent)</option>
+                            <option value="WHITE">⚪ สีขาว - ทั่วไป (General)</option>
+                            <option value="BLACK">⚫ สีดำ - เสียชีวิต (Dead on Arrival)</option>
+                        </select>
+                    </div>
+
+                    <!-- Incident Category (Trauma vs Non-Trauma) -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">ประเภทการออกเหตุ <span class="text-red-500">*</span></label>
+                        <select id="inputCategory" required class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="TRAUMA">🚗 อุบัติเหตุ (Trauma)</option>
+                            <option value="NON_TRAUMA">🩺 เจ็บป่วยทั่วไป / อายุรกรรม (Non-Trauma)</option>
+                        </select>
+                    </div>
+
+                    <!-- Fast Track Diseases -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">กลุ่มโรค Fast Track (ถ้ามี)</label>
+                        <select id="inputFastTrack" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                            <option value="NONE">-- ไม่มี / ไม่เข้า Fast Track --</option>
+                            <option value="Stroke">🧠 Stroke (โรคหลอดเลือดสมอง)</option>
+                            <option value="Sepsis">🦠 Sepsis (ภาวะติดเชื้อในกระแสเลือด)</option>
+                            <option value="Trauma FT">🩹 Trauma Fast Track (ผู้บาดเจ็บรุนแรง)</option>
+                            <option value="STEMI">🫀 STEMI (กล้ามเนื้อหัวใจขาดเลือดเฉียบพลัน)</option>
+                            <option value="Cardiac Arrest">⚡ Cardiac Arrest (หัวใจหยุดเต้นนอกโรงพยาบาล)</option>
+                        </select>
+                    </div>
+
+                    <!-- Location Text (No map needed as requested) -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">สถานที่เกิดเหตุ (Incident Location) <span class="text-red-500">*</span></label>
+                        <textarea id="inputLocation" rows="2" required placeholder="ระบุรายละเอียดสถานที่เกิดเหตุ เช่น สี่แยกวงเวียนช้าง อ.เมืองบุรีรัมย์, หน้าวัดกลาง ต.ในเมือง, ถนนจิระ..." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <!-- Chief Complaint / Diagnosis Notes -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">อาการสำคัญ / รายละเอียดเหตุ</label>
+                        <input type="text" id="inputNotes" placeholder="เช่น หอบเหนื่อยมาก BP ต่ำ, รถจักรยานยนต์ชนรถยนต์, แขนขาอ่อนแรงครึ่งซีก..." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeModal('addCaseModal')" class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-lg shadow-md transition-all">
+                        <i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกข้อมูล
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4">
+            <p>ระบบสารสนเทศการเก็บข้อมูลการออกเหตุฉุกเฉิน โรงพยาบาลบุรีรัมย์ | ออกแบบสำหรับงานฉุกเฉินการแพทย์ (EMS)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">พร้อมรองรับการใช้งานบน GitHub Pages &amp; Offline LocalStorage</p>
+        </div>
+    </footer>
+
+    <script>
+        // Default Sample EMS Dataset based on Buriram Hospital EMS Dispatches
+        const initialSampleData = [
+            {
+                id: "EMS-69001",
+                dateTime: "2026-09-01T08:15",
+                vehicleType: "AM1",
+                vehicleReg: "AM1 (ALS รพ.บุรีรัมย์)",
+                triage: "RED",
+                category: "NON_TRAUMA",
+                fastTrack: "Stroke",
+                location: "บ้านโคกกลวด ต.เสม็ด อ.เมืองบุรีรัมย์",
+                notes: "ปากเบี้ยว แขนขาซ้ายอ่อนแรง 1 ชม. ก่อนมา"
+            },
+            {
+                id: "EMS-69002",
+                dateTime: "2026-09-01T10:30",
+                vehicleType: "AM4",
+                vehicleReg: "AM4 (ALS รพ.บุรีรัมย์)",
+                triage: "RED",
+                category: "TRAUMA",
+                fastTrack: "Trauma FT",
+                location: "สี่แยกวงเวียนช้าง ถนนบุรีรัมย์-ประโคนชัย อ.เมืองบุรีรัมย์",
+                notes: "กระบะชนรถจักรยานยนต์ ซึมลง BP 80/50 mmHg"
+            },
+            {
+                id: "EMS-69003",
+                dateTime: "2026-09-01T11:45",
+                vehicleType: "BR",
+                vehicleReg: "บร-4321 บุรีรัมย์",
+                triage: "YELLOW",
+                category: "TRAUMA",
+                fastTrack: "NONE",
+                location: "หน้า บขส.บุรีรัมย์ ถนนจิระ ต.ในเมือง",
+                notes: "ล้มเอง แผลถลอก膝ทั้งสองข้าง มีอาการปวดไหล่"
+            },
+            {
+                id: "EMS-69004",
+                dateTime: "2026-09-02T02:10",
+                vehicleType: "AM1",
+                vehicleReg: "AM1 (ALS รพ.บุรีรัมย์)",
+                triage: "RED",
+                category: "NON_TRAUMA",
+                fastTrack: "STEMI",
+                location: "ตลาดสดเทศบาลบุรีรัมย์ ต.ในเมือง อ.เมืองบุรีรัมย์",
+                notes: "เจ็บแน่นหน้าอกเหงื่อออกตัวเย็น EKG 12 leads: ST elevation V1-V4"
+            },
+            {
+                id: "EMS-69005",
+                dateTime: "2026-09-02T14:20",
+                vehicleType: "MOH",
+                vehicleReg: "กท-8899 กระทรวงสาธารณสุข",
+                triage: "GREEN",
+                category: "NON_TRAUMA",
+                fastTrack: "NONE",
+                location: "ชุมชนหลังสถานีรถไฟบุรีรัมย์ ต.ในเมือง",
+                notes: "เวียนศีรษะ บ้านหมุน V/S ปกติ"
+            },
+            {
+                id: "EMS-69006",
+                dateTime: "2026-09-03T09:05",
+                vehicleType: "AM4",
+                vehicleReg: "AM4 (ALS รพ.บุรีรัมย์)",
+                triage: "RED",
+                category: "NON_TRAUMA",
+                fastTrack: "Sepsis",
+                location: "บ้านอิสาน ต.เสม็ด อ.เมืองบุรีรัมย์",
+                notes: "ไข้สูง ซึม หายใจหอบเหนื่อย BP 85/50 T 39.2 C"
+            },
+            {
+                id: "EMS-69007",
+                dateTime: "2026-09-03T16:40",
+                vehicleType: "AM1",
+                vehicleReg: "AM1 (ALS รพ.บุรีรัมย์)",
+                triage: "RED",
+                category: "NON_TRAUMA",
+                fastTrack: "Cardiac Arrest",
+                location: "หน้าสนามช้างอารีนา ต.อิสาณ อ.เมืองบุรีรัมย์",
+                notes: "หมดสติ ไม่หายใจ ทำการ CPR และ AED Shock 1 ครั้ง"
+            },
+            {
+                id: "EMS-69008",
+                dateTime: "2026-09-04T12:00",
+                vehicleType: "BR",
+                vehicleReg: "บร-9988 บุรีรัมย์",
+                triage: "WHITE",
+                category: "NON_TRAUMA",
+                fastTrack: "NONE",
+                location: "ถนนสืบศิริ ต.ในเมือง อ.เมืองบุรีรัมย์",
+                notes: "ขอความช่วยเหลือรับผู้ป่วยนอนติดเตียงเปลี่ยนสายให้อาหาร"
+            },
+            {
+                id: "EMS-69009",
+                dateTime: "2026-09-04T18:30",
+                vehicleType: "AM4",
+                vehicleReg: "AM4 (ALS รพ.บุรีรัมย์)",
+                triage: "YELLOW",
+                category: "TRAUMA",
+                fastTrack: "NONE",
+                location: "สามแยกโรงเรียนบุรีรัมย์พิทยาคม ต.ในเมือง",
+                notes: "รถเก๋งเฉี่ยวชน รถจักรยานยนต์ มีแผลฉีกขาดที่ศีรษะ รู้สึกตัวดี"
+            },
+            {
+                id: "EMS-69010",
+                dateTime: "2026-09-05T07:50",
+                vehicleType: "AM1",
+                vehicleReg: "AM1 (ALS รพ.บุรีรัมย์)",
+                triage: "BLACK",
+                category: "TRAUMA",
+                fastTrack: "NONE",
+                location: "ถนนสายบุรีรัมย์-ประโคนชัย กม.12 ต.เสม็ด",
+                notes: "อุบัติเหตุรุนแรง เสียชีวิต ณ จุดเกิดเหตุ (No sign of life)"
+            }
+        ];
+
+        // Main State
+        let emsData = [];
+        let filteredData = [];
+
+        // Chart Instances
+        let fastTrackChartInstance = null;
+        let triageChartInstance = null;
+        let vehicleChartInstance = null;
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            initCharts();
+            applyFilters();
+            setDefaultDateTime();
+        });
+
+        function setDefaultDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('inputDateTime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        function loadData() {
+            const stored = localStorage.getItem('ems_buriram_data_v1');
+            if (stored) {
+                try {
+                    emsData = JSON.parse(stored);
+                } catch(e) {
+                    emsData = [...initialSampleData];
+                }
+            } else {
+                emsData = [...initialSampleData];
+                saveToLocalStorage();
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('ems_buriram_data_v1', JSON.stringify(emsData));
+        }
+
+        function applyFilters() {
+            const vehicleFilter = document.getElementById('filterVehicle').value;
+            const triageFilter = document.getElementById('filterTriage').value;
+            const fastTrackFilter = document.getElementById('filterFastTrack').value;
+            const typeFilter = document.getElementById('filterType').value;
+            const searchFilter = document.getElementById('filterSearch').value.toLowerCase().trim();
+
+            filteredData = emsData.filter(item => {
+                // Vehicle Filter
+                if (vehicleFilter !== 'ALL') {
+                    if (vehicleFilter === 'AM1' && item.vehicleType !== 'AM1') return false;
+                    if (vehicleFilter === 'AM4' && item.vehicleType !== 'AM4') return false;
+                    if (vehicleFilter === 'BR' && item.vehicleType !== 'BR') return false;
+                    if (vehicleFilter === 'MOH' && item.vehicleType !== 'MOH') return false;
+                }
+
+                // Triage Filter
+                if (triageFilter !== 'ALL' && item.triage !== triageFilter) return false;
+
+                // Fast Track Filter
+                if (fastTrackFilter !== 'ALL') {
+                    if (fastTrackFilter === 'FT_ONLY' && (!item.fastTrack || item.fastTrack === 'NONE')) return false;
+                    if (fastTrackFilter !== 'FT_ONLY' && item.fastTrack !== fastTrackFilter) return false;
+                }
+
+                // Type Filter
+                if (typeFilter !== 'ALL' && item.category !== typeFilter) return false;
+
+                // Search Filter
+                if (searchFilter !== '') {
+                    const matchLoc = item.location ? item.location.toLowerCase().includes(searchFilter) : false;
+                    const matchNotes = item.notes ? item.notes.toLowerCase().includes(searchFilter) : false;
+                    const matchVehicle = item.vehicleReg ? item.vehicleReg.toLowerCase().includes(searchFilter) : false;
+                    const matchId = item.id ? item.id.toLowerCase().includes(searchFilter) : false;
+                    if (!matchLoc && !matchNotes && !matchVehicle && !matchId) return false;
+                }
+
+                return true;
+            });
+
+            updateKPIs();
+            updateCharts();
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('filterVehicle').value = 'ALL';
+            document.getElementById('filterTriage').value = 'ALL';
+            document.getElementById('filterFastTrack').value = 'ALL';
+            document.getElementById('filterType').value = 'ALL';
+            document.getElementById('filterSearch').value = '';
+            applyFilters();
+            showToast('ล้างตัวกรองเรียบร้อยแล้ว', 'info');
+        }
+
+        function updateKPIs() {
+            const total = filteredData.length;
+            const red = filteredData.filter(d => d.triage === 'RED').length;
+            const yellow = filteredData.filter(d => d.triage === 'YELLOW').length;
+            const green = filteredData.filter(d => d.triage === 'GREEN').length;
+            const white = filteredData.filter(d => d.triage === 'WHITE').length;
+            const black = filteredData.filter(d => d.triage === 'BLACK').length;
+
+            const trauma = filteredData.filter(d => d.category === 'TRAUMA').length;
+            const ftTotal = filteredData.filter(d => d.fastTrack && d.fastTrack !== 'NONE').length;
+
+            // Fast Track Breakdowns
+            const ftStroke = filteredData.filter(d => d.fastTrack === 'Stroke').length;
+            const ftSepsis = filteredData.filter(d => d.fastTrack === 'Sepsis').length;
+            const ftTrauma = filteredData.filter(d => d.fastTrack === 'Trauma FT').length;
+            const ftStemi = filteredData.filter(d => d.fastTrack === 'STEMI').length;
+            const ftArrest = filteredData.filter(d => d.fastTrack === 'Cardiac Arrest').length;
+
+            document.getElementById('kpiTotalCases').innerText = total;
+            document.getElementById('kpiRedCases').innerText = red;
+            document.getElementById('kpiRedPercent').innerText = total > 0 ? `${((red / total) * 100).toFixed(1)}% ของเคสทั้งหมด` : '0%';
+            
+            document.getElementById('kpiYellowCases').innerText = yellow;
+            document.getElementById('kpiGreenCases').innerText = green;
+            document.getElementById('kpiWhiteCases').innerText = white;
+            document.getElementById('kpiBlackCases').innerText = black;
+
+            document.getElementById('kpiTraumaCases').innerText = trauma;
+            document.getElementById('kpiTraumaPercent').innerText = total > 0 ? `${((trauma / total) * 100).toFixed(1)}% ของเคสทั้งหมด` : '0%';
+
+            document.getElementById('kpiFastTrackTotal').innerText = ftTotal;
+
+            document.getElementById('ftStrokeCount').innerText = `${ftStroke} เคส`;
+            document.getElementById('ftSepsisCount').innerText = `${ftSepsis} เคส`;
+            document.getElementById('ftTraumaCount').innerText = `${ftTrauma} เคส`;
+            document.getElementById('ftStemiCount').innerText = `${ftStemi} เคส`;
+            document.getElementById('ftArrestCount').innerText = `${ftArrest} เคส`;
+        }
+
+        function initCharts() {
+            // Chart 1: Fast Track Bar Chart
+            const ctxFT = document.getElementById('fastTrackChart').getContext('2d');
+            fastTrackChartInstance = new Chart(ctxFT, {
+                type: 'bar',
+                data: {
+                    labels: ['Stroke', 'Sepsis', 'Trauma FT', 'STEMI', 'Cardiac Arrest'],
+                    datasets: [{
+                        label: 'จำนวนเคส (ราย)',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: [
+                            'rgba(147, 51, 234, 0.85)',
+                            'rgba(217, 119, 6, 0.85)',
+                            'rgba(234, 88, 12, 0.85)',
+                            'rgba(225, 29, 72, 0.85)',
+                            'rgba(15, 23, 42, 0.85)'
+                        ],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Triage Pie Chart
+            const ctxTriage = document.getElementById('triageChart').getContext('2d');
+            triageChartInstance = new Chart(ctxTriage, {
+                type: 'doughnut',
+                data: {
+                    labels: ['🔴 สีแดง', '🟡 สีเหลือง', '🟢 สีเขียว', '⚪ สีขาว', '⚫ สีดำ'],
+                    datasets: [{
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: [
+                            '#ef4444',
+                            '#eab308',
+                            '#22c55e',
+                            '#cbd5e1',
+                            '#0f172a'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { boxWidth: 12, font: { family: 'Sarabun', size: 11 } }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+
+            // Chart 3: Vehicle Bar Chart
+            const ctxVehicle = document.getElementById('vehicleChart').getContext('2d');
+            vehicleChartInstance = new Chart(ctxVehicle, {
+                type: 'bar',
+                data: {
+                    labels: ['AM1 (รพ.)', 'AM4 (รพ.)', 'ทะเบียน บร', 'กระทรวง สธ.'],
+                    datasets: [{
+                        label: 'เคสออกปฏิบัติการ',
+                        data: [0, 0, 0, 0],
+                        backgroundColor: [
+                            'rgba(2, 132, 199, 0.85)',
+                            'rgba(14, 165, 233, 0.85)',
+                            'rgba(245, 158, 11, 0.85)',
+                            'rgba(100, 116, 139, 0.85)'
+                        ],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        }
+
+        function updateCharts() {
+            if (!fastTrackChartInstance || !triageChartInstance || !vehicleChartInstance) return;
+
+            // Update Fast Track
+            const ftStroke = filteredData.filter(d => d.fastTrack === 'Stroke').length;
+            const ftSepsis = filteredData.filter(d => d.fastTrack === 'Sepsis').length;
+            const ftTrauma = filteredData.filter(d => d.fastTrack === 'Trauma FT').length;
+            const ftStemi = filteredData.filter(d => d.fastTrack === 'STEMI').length;
+            const ftArrest = filteredData.filter(d => d.fastTrack === 'Cardiac Arrest').length;
+
+            fastTrackChartInstance.data.datasets[0].data = [ftStroke, ftSepsis, ftTrauma, ftStemi, ftArrest];
+            fastTrackChartInstance.update();
+
+            // Update Triage
+            const red = filteredData.filter(d => d.triage === 'RED').length;
+            const yellow = filteredData.filter(d => d.triage === 'YELLOW').length;
+            const green = filteredData.filter(d => d.triage === 'GREEN').length;
+            const white = filteredData.filter(d => d.triage === 'WHITE').length;
+            const black = filteredData.filter(d => d.triage === 'BLACK').length;
+
+            triageChartInstance.data.datasets[0].data = [red, yellow, green, white, black];
+            triageChartInstance.update();
+
+            // Update Vehicle
+            const am1 = filteredData.filter(d => d.vehicleType === 'AM1').length;
+            const am4 = filteredData.filter(d => d.vehicleType === 'AM4').length;
+            const br = filteredData.filter(d => d.vehicleType === 'BR').length;
+            const moh = filteredData.filter(d => d.vehicleType === 'MOH').length;
+
+            vehicleChartInstance.data.datasets[0].data = [am1, am4, br, moh];
+            vehicleChartInstance.update();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('incidentTableBody');
+            const emptyState = document.getElementById('tableEmptyState');
+            const countText = document.getElementById('recordCountText');
+
+            tbody.innerHTML = '';
+            countText.innerText = `แสดง ${filteredData.length} รายการ จากทั้งหมด ${emsData.length} รายการ`;
+
+            if (filteredData.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            // Sort data by dateTime descending
+            const sorted = [...filteredData].sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
+
+            sorted.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                // Format DateTime
+                const dt = new Date(item.dateTime);
+                const formattedDT = isNaN(dt.getTime()) ? item.dateTime : dt.toLocaleString('th-TH', {
+                    year: '2-digit', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                }) + ' น.';
+
+                // Triage Badge Styling
+                let triageBadge = '';
+                switch (item.triage) {
+                    case 'RED':
+                        triageBadge = `<span class="bg-red-100 text-red-700 font-bold px-2.5 py-1 rounded-full border border-red-200 text-xs inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>🔴 สีแดง (วิกฤต)</span>`;
+                        break;
+                    case 'YELLOW':
+                        triageBadge = `<span class="bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-full border border-amber-200 text-xs inline-flex items-center gap-1">🟡 สีเหลือง (เร่งด่วน)</span>`;
+                        break;
+                    case 'GREEN':
+                        triageBadge = `<span class="bg-emerald-100 text-emerald-800 font-medium px-2.5 py-1 rounded-full border border-emerald-200 text-xs inline-flex items-center gap-1">🟢 สีเขียว</span>`;
+                        break;
+                    case 'WHITE':
+                        triageBadge = `<span class="bg-slate-100 text-slate-700 font-medium px-2.5 py-1 rounded-full border border-slate-300 text-xs inline-flex items-center gap-1">⚪ สีขาว (ทั่วไป)</span>`;
+                        break;
+                    case 'BLACK':
+                        triageBadge = `<span class="bg-slate-900 text-white font-medium px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1">⚫ สีดำ (DOA)</span>`;
+                        break;
+                    default:
+                        triageBadge = `<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs">${item.triage}</span>`;
+                }
+
+                // Fast Track Tag
+                let ftTag = '';
+                if (item.fastTrack && item.fastTrack !== 'NONE') {
+                    ftTag = `<span class="bg-indigo-600 text-white font-bold text-[11px] px-2 py-0.5 rounded-md inline-block shadow-xs">⚡ ${item.fastTrack}</span>`;
+                }
+
+                // Category Tag
+                let catBadge = item.category === 'TRAUMA' 
+                    ? `<span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded font-medium text-xs">🚗 อุบัติเหตุ</span>`
+                    : `<span class="bg-sky-100 text-sky-800 px-2 py-0.5 rounded font-medium text-xs">🩺 เจ็บป่วย</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-center text-xs font-mono text-slate-400">${index + 1}</td>
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-slate-800 text-xs">${formattedDT}</div>
+                        <div class="text-[11px] font-mono text-slate-400">${item.id || '-'}</div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-sky-700 text-xs">${item.vehicleReg || item.vehicleType}</div>
+                    </td>
+                    <td class="py-3 px-4">${triageBadge}</td>
+                    <td class="py-3 px-4">
+                        <div class="space-y-1">
+                            ${ftTag ? `<div>${ftTag}</div>` : ''}
+                            <div class="text-xs text-slate-700 font-medium">${item.notes || '-'}</div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-start gap-1.5 text-slate-800 font-medium">
+                            <i class="fa-solid fa-location-dot text-red-500 mt-0.5 text-xs"></i>
+                            <span>${item.location || '-'}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">${catBadge}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="deleteCase('${item.id}')" title="ลบรายการ" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function toggleVehicleRegInput() {
+            const vType = document.getElementById('inputVehicleType').value;
+            const regInput = document.getElementById('inputVehicleReg');
+            if (vType === 'AM1') regInput.value = 'AM1 (ALS - รพ.บุรีรัมย์)';
+            else if (vType === 'AM4') regInput.value = 'AM4 (ALS - รพ.บุรีรัมย์)';
+            else if (vType === 'BR') regInput.value = 'บร-xxxx บุรีรัมย์';
+            else if (vType === 'MOH') regInput.value = 'กท-xxxx กระทรวงสาธารณสุข';
+        }
+
+        function saveNewCase(e) {
+            e.preventDefault();
+
+            const dt = document.getElementById('inputDateTime').value;
+            const vType = document.getElementById('inputVehicleType').value;
+            let vReg = document.getElementById('inputVehicleReg').value;
+            const triage = document.getElementById('inputTriage').value;
+            const category = document.getElementById('inputCategory').value;
+            const fastTrack = document.getElementById('inputFastTrack').value;
+            const location = document.getElementById('inputLocation').value;
+            const notes = document.getElementById('inputNotes').value;
+
+            if (!vReg) {
+                vReg = vType;
+            }
+
+            const newCase = {
+                id: 'EMS-' + Math.floor(10000 + Math.random() * 90000),
+                dateTime: dt,
+                vehicleType: vType,
+                vehicleReg: vReg,
+                triage: triage,
+                category: category,
+                fastTrack: fastTrack,
+                location: location,
+                notes: notes
+            };
+
+            emsData.unshift(newCase);
+            saveToLocalStorage();
+            applyFilters();
+
+            closeModal('addCaseModal');
+            document.getElementById('addCaseForm').reset();
+            setDefaultDateTime();
+
+            showToast('บันทึกเหตุฉุกเฉินสำเร็จแล้ว', 'success');
+        }
+
+        function deleteCase(id) {
+            // Using custom toast/modal logic instead of alert/confirm
+            if (window.confirm ? true : true) { // Avoid plain native alert/confirm popups
+                emsData = emsData.filter(d => d.id !== id);
+                saveToLocalStorage();
+                applyFilters();
+                showToast('ลบรายการเหตุฉุกเฉินแล้ว', 'info');
+            }
+        }
+
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseCSVAndAppend(text);
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseCSVAndAppend(csvText) {
+            const lines = csvText.split('\n');
+            let addedCount = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // Simple CSV split (handling commas inside quotes or plain)
+                const cols = line.split(',').map(c => c.replace(/^["']|["']$/g, '').trim());
+
+                if (cols.length >= 3) {
+                    // Try mapping columns flexibly
+                    const dt = cols[0] || new Date().toISOString().slice(0,16);
+                    const vReg = cols[1] || 'AM1';
+                    
+                    let vType = 'AM1';
+                    if (vReg.includes('AM4')) vType = 'AM4';
+                    else if (vReg.includes('AM1')) vType = 'AM1';
+                    else if (vReg.includes('บร')) vType = 'BR';
+                    else if (vReg.includes('กระทรวง') || vReg.includes('สาธารณสุข')) vType = 'MOH';
+
+                    const triage = (cols[2] || 'RED').toUpperCase();
+                    const fastTrack = cols[3] || 'NONE';
+                    const category = cols[4] || 'NON_TRAUMA';
+                    const location = cols[5] || 'อ.เมืองบุรีรัมย์';
+                    const notes = cols[6] || '';
+
+                    emsData.push({
+                        id: 'CSV-' + Math.floor(10000 + Math.random() * 90000),
+                        dateTime: dt,
+                        vehicleType: vType,
+                        vehicleReg: vReg,
+                        triage: ['RED','YELLOW','GREEN','WHITE','BLACK'].includes(triage) ? triage : 'RED',
+                        category: category.includes('TRAUMA') || category.includes('อุบัติเหตุ') ? 'TRAUMA' : 'NON_TRAUMA',
+                        fastTrack: fastTrack,
+                        location: location,
+                        notes: notes
+                    });
+                    addedCount++;
+                }
+            }
+
+            if (addedCount > 0) {
+                saveToLocalStorage();
+                applyFilters();
+                showToast(`นำเข้าข้อมูลสำเร็จ ${addedCount} รายการ`, 'success');
+            } else {
+                showToast('รูปแบบไฟล์ CSV ไม่ถูกต้อง หรือไม่มีข้อมูล', 'error');
+            }
+        }
+
+        function exportToCSV() {
+            if (filteredData.length === 0) {
+                showToast('ไม่มีข้อมูลสำหรับส่งออก', 'error');
+                return;
+            }
+
+            let csvContent = "\uFEFF"; // UTF-8 BOM for Excel support
+            csvContent += "ID,วันเวลา,รถออกรับเหตุ,ระดับTriage,FastTrack,ประเภทเหตุ,สถานที่เกิดเหตุ,รายละเอียดอาการ\n";
+
+            filteredData.forEach(item => {
+                const row = [
+                    `"${item.id || ''}"`,
+                    `"${item.dateTime || ''}"`,
+                    `"${item.vehicleReg || item.vehicleType || ''}"`,
+                    `"${item.triage || ''}"`,
+                    `"${item.fastTrack || 'NONE'}"`,
+                    `"${item.category === 'TRAUMA' ? 'อุบัติเหตุ' : 'เจ็บป่วยทั่วไป'}"`,
+                    `"${(item.location || '').replace(/"/g, '""')}"`,
+                    `"${(item.notes || '').replace(/"/g, '""')}"`
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Buriram_EMS_Report_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showToast('ส่งออกไฟล์ CSV เรียบร้อยแล้ว', 'success');
+        }
+
+        // Notification Toast Generator
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            let bg = 'bg-slate-800 text-white';
+            let icon = 'fa-info-circle';
+
+            if (type === 'success') {
+                bg = 'bg-emerald-600 text-white';
+                icon = 'fa-circle-check';
+            } else if (type === 'error') {
+                bg = 'bg-red-600 text-white';
+                icon = 'fa-circle-exclamation';
+            }
+
+            toast.className = `${bg} px-4 py-3 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
